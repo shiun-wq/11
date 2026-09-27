@@ -21,6 +21,7 @@
 }
 
 html {
+  overflow-x: clip;
   scroll-behavior: smooth;
   scroll-padding-top: 150px;
 }
@@ -332,45 +333,83 @@ h3 {
   align-items: center;
   gap: 12px;
   font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .icon-button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   color: var(--brass-soft);
   cursor: pointer;
   border: 1px solid var(--line);
   border-radius: 50%;
   background: rgba(10, 10, 8, 0.38);
-  transition: transform 0.35s ease, border-color 0.35s ease;
+  transition: transform 0.35s ease, border-color 0.35s ease, color 0.35s ease;
 }
 
 .icon-button:hover {
-  transform: scale(1.08);
+  color: var(--parchment);
   border-color: var(--brass);
+  transform: scale(1.06);
 }
 
-.character-slider {
+.icon-button:focus-visible,
+.profile-card:focus-visible {
+  outline: 1px solid var(--brass-soft);
+  outline-offset: 4px;
+}
+
+/* 自動翻頁的倒數：一條黃銅細線，由左往右填滿 */
+.slider-progress {
+  position: relative;
+  height: 1px;
+  margin: 0 auto 22px;
+  background: var(--line);
   overflow: hidden;
+}
+
+.slider-progress span {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent, var(--brass-soft));
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.slider-progress.is-running span {
+  animation: drawerCountdown var(--slide-delay, 4800ms) linear forwards;
+}
+
+.archive-stage.is-paused .slider-progress span {
+  animation-play-state: paused;
+}
+
+/* 每頁張數由斷點決定，JS 讀這個變數計算總頁數 */
+.character-slider {
+  --per-page: 6;
+  --card-gap: 20px;
+  overflow: hidden;
+  touch-action: pan-y;
 }
 
 .character-track {
   display: grid;
-  grid-template-columns: repeat(18, calc((100% - 100px) / 6));
-  gap: 20px;
-  transition: opacity 0.72s ease, filter 0.72s ease, transform 1.1s cubic-bezier(0.2, 0.72, 0.15, 1);
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - (var(--per-page) - 1) * var(--card-gap)) / var(--per-page));
+  gap: var(--card-gap);
 }
 
-.archive-stage.is-rendering-out .character-track {
-  opacity: 0;
-  filter: blur(8px);
-  transition: opacity 0.42s ease, filter 0.42s ease, transform 0s linear;
+/* 揭幕：舊的一頁由左到右依序褪入暗處，新的一頁像帷幕升起般逐張浮現 */
+.profile-card.is-leaving {
+  animation: curtainDown 0.45s cubic-bezier(0.55, 0, 0.75, 0.2) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
 
-.archive-stage.is-rendering-in .character-slider {
-  animation: renderPageIn 0.72s ease both;
+.profile-card.is-entering {
+  animation: curtainUp 0.9s cubic-bezier(0.2, 0.7, 0.15, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
 }
 
 .profile-card {
@@ -381,6 +420,7 @@ h3 {
   border-radius: 18px;
   background: rgba(17, 16, 14, 0.42);
   box-shadow: 0 26px 70px rgba(0, 0, 0, 0.36);
+  cursor: pointer;
   isolation: isolate;
 }
 
@@ -790,17 +830,57 @@ h3 {
   }
 }
 
-@keyframes renderPageIn {
+@keyframes curtainDown {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    clip-path: inset(0 0 0 0 round 18px);
+  }
+
+  to {
+    opacity: 0;
+    filter: blur(6px);
+    clip-path: inset(0 0 100% 0 round 18px);
+  }
+}
+
+@keyframes curtainUp {
   from {
     opacity: 0;
-    filter: blur(8px);
-    transform: translateY(18px);
+    filter: blur(6px);
+    clip-path: inset(100% 0 0 0 round 18px);
+    transform: translateY(22px);
+  }
+
+  60% {
+    opacity: 1;
   }
 
   to {
     opacity: 1;
     filter: blur(0);
+    clip-path: inset(0 0 0 0 round 18px);
     transform: translateY(0);
+  }
+}
+
+@keyframes drawerCountdown {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-card.is-leaving,
+  .profile-card.is-entering,
+  .slider-progress.is-running span {
+    animation: none;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 
@@ -822,24 +902,9 @@ h3 {
     min-height: 560px;
   }
 
-  .character-track {
-    grid-template-columns: repeat(18, minmax(210px, 32vw));
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    padding-bottom: 12px;
-  }
-
   .character-slider {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .profile-card {
-    scroll-snap-align: center;
-  }
-
-  .slider-controls {
-    display: none;
+    --per-page: 3;
+    --card-gap: 16px;
   }
 
   .detail-grid {
@@ -887,15 +952,18 @@ h3 {
     border-radius: 0;
   }
 
-  .character-slider {
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 18px;
+  .archive-toolbar {
+    flex-direction: column;
+    gap: 12px;
   }
 
-  .character-track {
-    grid-template-columns: repeat(18, minmax(42vw, 48vw));
-    gap: 14px;
-    padding-inline: 18px;
+  .slider-controls {
+    position: static;
+  }
+
+  .character-slider {
+    --per-page: 2;
+    --card-gap: 12px;
   }
 
   .profile-card,
